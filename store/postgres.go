@@ -19,17 +19,25 @@ func InitStore(ctx context.Context, postgresURL string) (*Store, error) {
 	}
 
 	_, err = dbpool.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS event (
-		    id 			text 			PRIMARY KEY,
-		    pubkey 		text 			NOT NULL,
-		    kind 		integer 		NOT NULL,
-		    created_at 	timestamp 		NOT NULL,
-		    sig 		text 			NOT NULL,
-		    content 	text 			NOT NULL,
-		    origin      bytea           NOT NULL,
-		    etags		text[],
-		    ptags		text[]
-		)
+CREATE TABLE IF NOT EXISTS event (
+	id 			text 			PRIMARY KEY,
+	pubkey 		text 			NOT NULL,
+	kind 		integer 		NOT NULL,
+	created_at 	timestamp 		NOT NULL,
+	sig 		text 			NOT NULL,
+	content 	text 			NOT NULL,
+	origin      bytea           NOT NULL,
+	etags		text[],
+	ptags		text[]
+);
+
+CREATE OR REPLACE FUNCTION notify_event() RETURNS trigger AS $$
+    BEGIN
+    	PERFORM pg_notify('nostr_event', row_to_json(NEW.origin)::text);
+		RETURN NEW;
+	END;
+$$ LANGUAGE plpgsql;
+    
     `)
 	if err != nil {
 		return nil, fmt.Errorf("init table 'event', error: %s", err)

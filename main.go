@@ -55,6 +55,15 @@ func StartCommand(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalf("Failed to initialize store, error: %s", err)
 	}
+	defer database.Close()
+
+	// PG Listener
+	pgListenerConn, err := database.Acquire(appCtx)
+	if err != nil {
+		log.Fatalf("Failed to acquire database connection, error: %s", err)
+	}
+	pgListener := NewPGListener(pgListenerConn)
+	pgListener.Start(appCtx)
 
 	// HTTP Listener
 	httpServer := &http.Server{}

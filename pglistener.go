@@ -33,7 +33,10 @@ func (p *PGListener) RemoveSubscriber(subscriptionId string) {
 	delete(p.Subscribers, subscriptionId)
 }
 
-func (p *PGListener) Start(ctx context.Context, pgChannel string) {
+func (p *PGListener) Start(ctx context.Context) {
+	if _, err := p.Exec(ctx, "LISTEN nostr_events"); err != nil {
+		log.Fatalf("Failed to listen nostr_events, error: %s", err)
+	}
 	for {
 		notification, err := p.Conn.Conn().WaitForNotification(ctx)
 		if err != nil {
