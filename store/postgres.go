@@ -26,14 +26,14 @@ CREATE TABLE IF NOT EXISTS event (
 	created_at 	timestamp 		NOT NULL,
 	sig 		text 			NOT NULL,
 	content 	text 			NOT NULL,
-	origin      bytea           NOT NULL,
+	origin      json 			NOT NULL,
 	etags		text[],
 	ptags		text[]
 );
 
 CREATE OR REPLACE FUNCTION notify_event() RETURNS trigger AS $$
     BEGIN
-    	PERFORM pg_notify('nostr_event', row_to_json(NEW.origin)::text);
+    	PERFORM pg_notify('nostr_event', NEW.origin::text);
 		RETURN NEW;
 	END;
 $$ LANGUAGE plpgsql;
@@ -41,7 +41,7 @@ $$ LANGUAGE plpgsql;
     
     
 DROP TRIGGER IF EXISTS nostr_event_trigger ON event;
-CREATE TRIGGER nostr_event AFTER INSERT ON event FOR EACH ROW EXECUTE FUNCTION notify_event();
+CREATE TRIGGER nostr_event_trigger AFTER INSERT ON event FOR EACH ROW EXECUTE FUNCTION notify_event();
 `)
 
 	if err != nil {
