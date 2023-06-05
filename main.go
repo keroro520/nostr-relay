@@ -63,7 +63,10 @@ func StartCommand(ctx *cli.Context) error {
 		log.Fatalf("Failed to acquire database connection, error: %s", err)
 	}
 	pgListener := NewPGListener(pgListenerConn)
-	pgListener.Start(appCtx)
+	go func() {
+		defer pgListenerConn.Release()
+		pgListener.Start(appCtx)
+	}()
 
 	// HTTP Listener
 	httpServer := &http.Server{}
@@ -89,9 +92,17 @@ func StartCommand(ctx *cli.Context) error {
 		}
 
 		go func() {
+			connCtx, connCtxCancel := context.WithCancel(appCtx)
+			defer connCtxCancel()
 			defer func() { _ = conn.Close() }()
 
 			for {
+				select {
+				case <-appCtx.Done():
+					return
+				default:
+				}
+
 				data, _, err := wsutil.ReadClientData(conn)
 				if err == io.EOF {
 					log.Printf("[DEBUG] client side closed")
@@ -110,7 +121,7 @@ func StartCommand(ctx *cli.Context) error {
 						return
 					}
 					log.Printf("[DEBUG] EventEnvelope: %s", *event)
-					if err = database.AddEvent(appCtx, &event.Event); err != nil {
+					if err = database.AddEvent(connCtx, &event.Event); err != nil {
 						log.Printf("[ERROR] Failed to add event to database, error: %s", err)
 						return
 					}
@@ -122,12 +133,11 @@ func StartCommand(ctx *cli.Context) error {
 					}
 					log.Printf("[DEBUG] ReqEnvelope: %s", *req)
 
-					events, err := database.FilterEvents(appCtx, &req.Filters)
+					events, err := database.FilterEvents(connCtx, &req.Filters)
 					if err != nil {
 						log.Printf("[ERROR] Failed to filter events, error: %s", err)
 						return
 					}
-					log.Printf("[DEBUG] Filtered events: %s", events)
 
 					for _, event := range events {
 						eventEnvelope := nostr.EventEnvelope{
@@ -167,6 +177,30 @@ func StartCommand(ctx *cli.Context) error {
 						log.Printf("[ERROR] Failed to flush eose, error: %s", err)
 						return
 					}
+
+					eventChan := pgListener.AddSubscriber(
+						req.SubscriptionID,
+						req.Filters,
+					)
+					go func(subscriptionID string, eventChan chan nostr.Event) {
+						for {
+							select {
+							case <-connCtx.Done():
+								return
+							case event := <-eventChan:
+								eventEnvelope := nostr.EventEnvelope{SubscriptionID: &subscriptionID, Event: event}
+								marshaledEvent, err := eventEnvelope.MarshalJSON()
+								if err != nil {
+									log.Printf("[ERROR] Failed to marshal event envelope, event: %s, error: %s", event, err)
+								} else {
+									err = wsutil.WriteServerText(conn, marshaledEvent)
+									if err != nil {
+										log.Printf("[ERROR] Failed to write event envelope, error: %s", err)
+									}
+								}
+							}
+						}
+					}(req.SubscriptionID, eventChan)
 				case "NOTICE":
 					notice, ok := envelope.(*nostr.NoticeEnvelope)
 					if !ok {

@@ -34,10 +34,16 @@ func (p *PGListener) RemoveSubscriber(subscriptionId string) {
 }
 
 func (p *PGListener) Start(ctx context.Context) {
-	if _, err := p.Exec(ctx, "LISTEN nostr_events"); err != nil {
+	if _, err := p.Exec(ctx, "LISTEN nostr_event"); err != nil {
 		log.Fatalf("Failed to listen nostr_events, error: %s", err)
 	}
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		notification, err := p.Conn.Conn().WaitForNotification(ctx)
 		if err != nil {
 			log.Printf("[ERROR] Failed to receive notification: %s", err)
@@ -64,6 +70,7 @@ type Subscriber struct {
 }
 
 func (p *Subscriber) NotifyIfMatch(event *nostr.Event) {
+	log.Printf("[DEBUG] Notifying subscriber: %s, isMatch: %t", event, p.Filters.Match(event))
 	if p.Filters.Match(event) {
 		select {
 		case p.Chan <- *event:

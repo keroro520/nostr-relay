@@ -38,7 +38,12 @@ CREATE OR REPLACE FUNCTION notify_event() RETURNS trigger AS $$
 	END;
 $$ LANGUAGE plpgsql;
     
-    `)
+    
+    
+DROP TRIGGER IF EXISTS nostr_event_trigger ON event;
+CREATE TRIGGER nostr_event AFTER INSERT ON event FOR EACH ROW EXECUTE FUNCTION notify_event();
+`)
+
 	if err != nil {
 		return nil, fmt.Errorf("init table 'event', error: %s", err)
 	}
