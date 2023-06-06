@@ -1,4 +1,4 @@
-package main
+package nostr_relay
 
 import (
 	"context"

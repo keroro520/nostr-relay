@@ -13,20 +13,18 @@ import (
 	"log"
 	"net"
 	"net/http"
-	config "nostr_relay/config"
-	"nostr_relay/flags"
-	"nostr_relay/store"
+	"nostr_relay"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
-var cfg *config.Config
+var cfg *nostr_relay.Config
 var pgpool *pgxpool.Pool
 
 func main() {
 	app := cli.NewApp()
-	app.Flags = flags.Flags
+	app.Flags = nostr_relay.Flags
 	app.Version = "v0.0.1"
 	app.Name = "nostr-relay"
 	app.Usage = "NOSTR Relay"
@@ -40,7 +38,7 @@ func main() {
 
 func StartCommand(ctx *cli.Context) error {
 	// Config
-	cfg = config.NewConfig(ctx)
+	cfg = nostr_relay.NewConfig(ctx)
 	jsonConfig, err := json.Marshal(cfg)
 	if err != nil {
 		log.Fatalf("Failed to marshal config, error: %s", err)
@@ -51,7 +49,7 @@ func StartCommand(ctx *cli.Context) error {
 	appCtx, appCtxCancel := context.WithCancel(context.Background())
 
 	// Database
-	database, err := store.InitStore(appCtx, cfg.DatabaseURL)
+	database, err := nostr_relay.InitStore(appCtx, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Failed to initialize store, error: %s", err)
 	}
@@ -62,7 +60,7 @@ func StartCommand(ctx *cli.Context) error {
 	if err != nil {
 		log.Fatalf("Failed to acquire database connection, error: %s", err)
 	}
-	pgListener := NewPGListener(pgListenerConn)
+	pgListener := nostr_relay.NewPGListener(pgListenerConn)
 	go func() {
 		defer pgListenerConn.Release()
 		pgListener.Start(appCtx)

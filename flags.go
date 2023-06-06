@@ -1,4 +1,4 @@
-package flags
+package nostr_relay
 
 import (
 	"github.com/urfave/cli"

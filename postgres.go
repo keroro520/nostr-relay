@@ -1,4 +1,4 @@
-package store
+package nostr_relay
 
 import (
 	"context"
@@ -37,9 +37,9 @@ CREATE OR REPLACE FUNCTION notify_event() RETURNS trigger AS $$
 		RETURN NEW;
 	END;
 $$ LANGUAGE plpgsql;
-    
-    
-    
+
+
+
 DROP TRIGGER IF EXISTS nostr_event_trigger ON event;
 CREATE TRIGGER nostr_event_trigger AFTER INSERT ON event FOR EACH ROW EXECUTE FUNCTION notify_event();
 `)

@@ -1,4 +1,4 @@
-package store
+package nostr_relay
 
 import (
 	"github.com/nbd-wtf/go-nostr"
